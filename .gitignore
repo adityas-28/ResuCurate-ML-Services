@@ -216,3 +216,5 @@ __marimo__/
 .streamlit/secrets.toml
 
 *.pdf
+links.txt
+demo.txt
