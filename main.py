@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.ats_score import router as ats_router
+from app.api.generate_resume import router as generate_resume_router
 import os
 
 app = FastAPI(title="ResuCurate ML Services", version="1.0.0")
@@ -24,6 +25,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(ats_router)
+app.include_router(generate_resume_router)
 
 @app.get("/")
 async def root():

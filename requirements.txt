@@ -21,3 +21,4 @@ python-dotenv
 pandas
 streamlit
 google-genai
+supabase

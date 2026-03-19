@@ -8,7 +8,7 @@ from app.services.pdf_parser import (
     classify_links
 )
 from typing import Optional
-
+ 
 router = APIRouter(prefix="/api", tags=["ATS"])
 
 
@@ -20,7 +20,7 @@ async def calculate_ats_score(
     """
     Upload a PDF resume and get ATS score analysis.
     """
-    # print("/ats-score hit")
+    print("/ats-score hit")
     try:
         # Validate file type
         filename = file.filename or "unknown.pdf"
@@ -65,7 +65,9 @@ async def calculate_ats_score(
 
         return JSONResponse(content=response)
     
-    except HTTPException:
+    except HTTPException as e:
+        print(e)
         raise
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=500, detail=f"Error processing resume: {str(e)}")
