@@ -67,7 +67,9 @@ async def fetch_user_arsenal(user_id: str) -> Dict[str, List[Dict[str, Any]]]:
 
     results = await asyncio.gather(*[_fetch_table(t) for t in ARSENAL_TABLES])
     print("results: ", results)
-    return {t: results[i] for i, t in enumerate(ARSENAL_TABLES)}
+    thing_to_return = {t: results[i] for i, t in enumerate(ARSENAL_TABLES)}
+    print("thing to return: ", thing_to_return)
+    return thing_to_return
 
 
 async def extract_keywords(job_description: str) -> List[str]:
@@ -271,10 +273,13 @@ async def generate_resume(payload: GenerateResumeRequest):
     """
     try:
         arsenal = await fetch_user_arsenal(payload.user_id)
+        print("got arsenal values")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch Supabase data: {str(e)}")
 
     keywords = await extract_keywords(payload.job_description)
+    print("got keywords")
+    print("keywords: ", keywords)
 
     personal_rows = arsenal.get("personal_details", [])
     summary_rows = arsenal.get("professional_summary", [])
@@ -283,10 +288,13 @@ async def generate_resume(payload: GenerateResumeRequest):
     projects_rows = arsenal.get("projects", [])
     exp_rows = arsenal.get("professional_experience", [])
     edu_rows = arsenal.get("education", [])
+    print("got all rows")
 
     filtered_skills_rows = filter_skills(skills_rows, keywords, limit=30 if not payload.single_page_only else 18)
     filtered_projects_rows = filter_projects(projects_rows, keywords, limit=6 if not payload.single_page_only else 4)
     filtered_exp_rows = filter_experience(exp_rows, keywords, limit=6 if not payload.single_page_only else 4)
+
+    print("filtered skills and projects")
 
     enhanced_projects = await enhance_with_llm(
         filtered_projects_rows,
@@ -330,6 +338,8 @@ async def generate_resume(payload: GenerateResumeRequest):
         },
     }
 
+    print("structured resume: ", structured_resume)
+
     supabase = get_supabase_client()
 
     # ---------- Upload structured resume JSON to Supabase Storage (bucket: resumes) ----------
@@ -344,10 +354,15 @@ async def generate_resume(payload: GenerateResumeRequest):
         # If your bucket still rejects this, consider allowing "text/plain" or
         # changing this to "application/octet-stream" in your project.
         try:
+            print("uploading to storage")
             storage_res = supabase.storage.from_("resumes").upload(
-                file_path,
-                file_bytes,
+                path=file_path,
+                file=file_bytes,
+                file_options={
+                    "content-type": "application/json"
+                }
             )
+            print("upload to storage successful")
         except TypeError:
             # Fallback for clients that require explicit options but with strict typing
             storage_res = supabase.storage.from_("resumes").upload(
@@ -360,16 +375,23 @@ async def generate_resume(payload: GenerateResumeRequest):
         # Older supabase-py returns a dict with possible "error" key; newer returns an object.
         storage_error = None
         if isinstance(storage_res, dict):
+            print("storage_res is a dict")
             storage_error = storage_res.get("error")
         else:
+            print("storage_res is not a dict")
             storage_error = getattr(storage_res, "error", None)
+            print("storage_error: ", storage_error)
             data_attr = getattr(storage_res, "data", None)
+            print("data_attr: ", data_attr)
             if not storage_error and isinstance(data_attr, dict):
                 storage_error = data_attr.get("error")
+                print("storage_error: ", storage_error)
         if storage_error:
+            print("storage_error: ", storage_error)
             raise RuntimeError(f"Storage upload failed: {storage_error}")
 
         # Insert row into resumes table
+        print("inserting row into resumes table")
         db_res = supabase.table("resumes").insert(
             {
                 "user_id": payload.user_id,
@@ -377,23 +399,27 @@ async def generate_resume(payload: GenerateResumeRequest):
                 "file_path": file_path,
             }
         ).execute()
-
+        print("row inserted into resumes table")
         data = getattr(db_res, "data", None)
         if not data or not isinstance(data, list):
+            print("data is not a list")
             raise RuntimeError(f"Invalid Supabase DB response: {data}")
 
         row = data[0]
         if not isinstance(row, dict) or "id" not in row:
+            print("row is not a dict or id is not in row")
             raise RuntimeError(f"Unexpected resumes row: {row}")
 
         # Public URL for the stored JSON (if bucket is public)
         public = supabase.storage.from_("resumes").get_public_url(file_path)
         public_url = getattr(public, "public_url", None) or getattr(public, "data", {}).get("publicUrl")  # type: ignore[union-attr]
-
+        print("public_url: ", public_url)
         return row["id"], public_url
 
     try:
+        print("uploading and inserting resume")
         resume_id, public_url = await asyncio.to_thread(_upload_and_insert)
+        print("resume uploaded and inserted")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to persist resume: {str(e)}")
 

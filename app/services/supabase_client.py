@@ -23,13 +23,15 @@ def get_supabase_client() -> Client:
     - VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY (fallback for local dev).
     """
     url = _env("SUPABASE_URL", "VITE_SUPABASE_URL")
-    key = _env("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY")
+    key = _env("SUPABASE_SERVICE_ROLE_KEY", "VITE_SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY")
 
     if not url or not key:
         raise RuntimeError(
             "Supabase env vars missing. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY "
             "(or SUPABASE_ANON_KEY / VITE_SUPABASE_* for local dev)."
         )
+    
+    print("Final Supabase URL:", url)
 
     return create_client(url, key)
 
